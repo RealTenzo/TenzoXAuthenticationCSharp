@@ -1,0 +1,32 @@
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\Authentication Example CSharp.exe.config
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\Authentication Example CSharp.exe
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\Authentication Example CSharp.pdb
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\Microsoft.Bcl.AsyncInterfaces.dll
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Buffers.dll
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.IO.Pipelines.dll
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Memory.dll
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Numerics.Vectors.dll
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Runtime.CompilerServices.Unsafe.dll
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Text.Encodings.Web.dll
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Text.Json.dll
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Threading.Tasks.Extensions.dll
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.ValueTuple.dll
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\Microsoft.Bcl.AsyncInterfaces.xml
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Buffers.xml
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.IO.Pipelines.xml
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Memory.xml
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Numerics.Vectors.xml
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Runtime.CompilerServices.Unsafe.xml
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Text.Encodings.Web.xml
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Text.Json.xml
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.Threading.Tasks.Extensions.xml
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\bin\Debug\System.ValueTuple.xml
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\obj\Debug\Authentication Example CSharp.csproj.AssemblyReference.cache
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\obj\Debug\Authentication_Example_CSharp.Form1.resources
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\obj\Debug\Authentication_Example_CSharp.Properties.Resources.resources
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\obj\Debug\Authentication Example CSharp.csproj.GenerateResource.cache
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\obj\Debug\Authentication Example CSharp.csproj.CoreCompileInputs.cache
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\obj\Debug\Authenti.8E3F0F2E.Up2Date
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\obj\Debug\Authentication Example CSharp.exe
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\obj\Debug\Authentication Example CSharp.pdb
+D:\Sources\Authentication Example CSharp\Authentication Example CSharp\obj\Debug\Authentication Example CSharp.exe.config
