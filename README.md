@@ -12,6 +12,15 @@
 * Expiry date and user info retrieval
 * Simple and clean C# integration
 
+## Requirements
+
+* .NET Framework / .NET Core
+* **System.Text.Json** (install via NuGet)
+
+```bash
+Install-Package System.Text.Json
+```
+
 ## Installation
 
 1. Clone the repository:
@@ -21,7 +30,7 @@ git clone https://github.com/yourusername/TenzoXAuthenticationCSharp.git
 ```
 
 2. Include `TenzoAuth.cs` and `message.cs` in your project.
-
+3. Ensure `System.Text.Json` is installed in your project.
 
 ## Usage Example
 
@@ -55,6 +64,11 @@ else
 * Ensure your app version matches the version expected by the library.
 * License keys can be pre-generated or dynamically created by your system.
 * Works with both **WinForms** and **console applications**.
+
+## Credits
+
+* Uses **System.Text.Json** for JSON serialization and parsing
+
 
 ## Contributing
 
