@@ -1,0 +1,29 @@
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\CSHARP SDK TenzoXAuthentication.exe.config
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\CSHARP SDK TenzoXAuthentication.exe
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\CSHARP SDK TenzoXAuthentication.pdb
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\Microsoft.Bcl.AsyncInterfaces.dll
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Buffers.dll
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.IO.Pipelines.dll
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Memory.dll
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Numerics.Vectors.dll
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Runtime.CompilerServices.Unsafe.dll
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Text.Encodings.Web.dll
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Text.Json.dll
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Threading.Tasks.Extensions.dll
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\Microsoft.Bcl.AsyncInterfaces.xml
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Buffers.xml
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.IO.Pipelines.xml
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Memory.xml
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Numerics.Vectors.xml
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Runtime.CompilerServices.Unsafe.xml
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Text.Encodings.Web.xml
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Text.Json.xml
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\bin\Debug\System.Threading.Tasks.Extensions.xml
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\obj\Debug\CSHARP SDK TenzoXAuthentication.csproj.AssemblyReference.cache
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\obj\Debug\CSHARP_SDK_TenzoXAuthentication.Form1.resources
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\obj\Debug\CSHARP_SDK_TenzoXAuthentication.Properties.Resources.resources
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\obj\Debug\CSHARP SDK TenzoXAuthentication.csproj.GenerateResource.cache
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\obj\Debug\CSHARP SDK TenzoXAuthentication.csproj.CoreCompileInputs.cache
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\obj\Debug\CSHARP S.60FAD2FA.Up2Date
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\obj\Debug\CSHARP SDK TenzoXAuthentication.exe
+D:\Sources\CSHARP SDK TenzoXAuthentication\CSHARP SDK TenzoXAuthentication\obj\Debug\CSHARP SDK TenzoXAuthentication.pdb
