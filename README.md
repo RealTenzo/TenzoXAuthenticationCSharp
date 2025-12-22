@@ -2,7 +2,7 @@
 
 **TenzoXAuthenticationCSharp** is a simple C# library for adding **authentication and licensing** functionality to your applications. It provides **login, registration, license validation, and version checking** features in a few lines of code. Ideal for developers who want to secure their apps with minimal effort.
 
-**Website:** [https://txabeta.netlify.app/](https://txabeta.netlify.app/)
+**Website:** [https://tenxoxauthentication.qzz.io](https://tenxoxauthentication.qzz.io)
 
 ## Features
 
@@ -29,35 +29,56 @@ Install-Package System.Text.Json
 git clone https://github.com/yourusername/TenzoXAuthenticationCSharp.git
 ```
 
-2. Include `TenzoAuth.cs` and `message.cs` in your project.
+2. Include `txa.cs` in your project.
 3. Ensure `System.Text.Json` is installed in your project.
 
 ## Usage Example
 
 ```csharp
-// Initialize auth
-TenzoAuth auth = new TenzoAuth("1.0", "AppName", "SecretKey");
+// auth info get from site
+ public static TXA TXA = new TXA(
+ name: "",
+ secret: "",
+ version: ""
+        );
+
+
+//call on program load
+TXA.Init();
 
 // Login
-if(auth.Login("username", "password"))
-{
-    Console.WriteLine($"Login successful!\nUser: {auth.GetCurrentUsername()}\nExpiry: {auth.GetExpiryDate()}");
-}
-else
-{
-    Console.WriteLine("Login failed: " + auth.GetLastStatusMessage());
-}
+var result = await TXA.Login(textBox1.Text, textBox2.Text);
+
+            if (result.Success)
+            {
+                label1.Text = result.Message;
+            }
+            else
+            {
+                label1.Text = result.Message;
+            }
+
 
 // Register
-if(auth.Register("username", "password", "license"))
-{
-    Console.WriteLine($"Registration successful!\nUser: {auth.GetCurrentUsername()}\nExpiry: {auth.GetExpiryDate()}");
-}
-else
-{
-    Console.WriteLine("Registration failed: " + auth.GetLastStatusMessage());
-}
+            var result = await TXA.Register(textBox1.Text, textBox2.Text, textBox3.Text);
+
+            if (result.Success)
+            {
+                label1.Text = result.Message;
+            }
+            else
+            {
+                label1.Text = result.Message;
+            }
+//variable
+            label1.Text = TXA.Var("AoB");
+
 ```
+
+
+
+
+
 
 ## Notes
 
