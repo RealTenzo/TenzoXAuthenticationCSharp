@@ -7,8 +7,8 @@ namespace CSHARP_SDK_TenzoXAuthentication
     public partial class Form1 : Form
     {
         public static TXA TXA = new TXA(
-          name: "test",
-          secret: "6026bb04699ffdca3f4b8211c2c3d8d7",
+          name: "",
+          secret: "",
           version: "1.0"
         );
 
