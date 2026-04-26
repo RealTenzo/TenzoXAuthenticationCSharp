@@ -30,7 +30,7 @@ git clone https://github.com/yourusername/TenzoXAuthenticationCSharp.git
 ```
 
 2. Include `txa.cs` in your project.
-3. Ensure `System.Text.Json` is installed in your project.
+3. Ensure `Newtonsoft.Json` is installed in your project.
 
 ## Usage Example
 
