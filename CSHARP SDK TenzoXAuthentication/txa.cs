@@ -1,166 +1,156 @@
-﻿using System;
-using System.Net.Http;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
-using System.Security.Principal;
+using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.IO;
+using System.Net;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Security.Principal;
+using System.Text;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 namespace TXAAuth
 {
     public class TXA
     {
+        private const string EmbeddedPublicKeyPem = @"-----BEGIN PUBLIC KEY-----
+MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAh3fjJEqt8/GbGNkhn9ws
+8v7cStTdgEv2712vsJUhyJXS/hhG6wLcTHCk/hY/+jICvAF7lsSAMmz4Nwntp62B
+cPj+OP6eWcX4WSSciK0O+i1qiF0QxXEFchvQCcUa3GVxrDLKFPB5/44ct+INqUV5
+dZZYhZl39zQcs+2zvY3kJGvOafopGhsuedMh7eLkPP09lUAXnX30yOyU4G71MXut
+mKo1V8M3F4O7G91s6bZLhxONOU6NhgSuykCM2u3hzP34nXC4uJe0Lx/8ENftWNwZ
+3Qf3cuXcXCZJsWSzEhfYSZX5waQOUoE5qqqslygoCt40lCP7qk1Z9drP9C9losxy
+f1vHTTismKkTnVHSZJRXu1wtYC79J8F3f8oG97uwo3p+p1LA+CdF1X69xSY0nFZu
+QF1qxkOV4NUrcOXra+blw8FaowKahBBzjJeAzjoTa02DxexQSk2kDVvPmUrOv68U
+L/i6HsvOzaC62R7mNOKiqaDB9bircvGj/BknhX5Etf5RAgMBAAE=
+-----END PUBLIC KEY-----";
+
+        private const string TamperMessage = "Tamper detected. Access blocked.";
+        private const int AllowedClockSkewSeconds = 120;
+
         public string AppName { get; private set; }
         public string Secret { get; private set; }
         public string Version { get; private set; }
 
         private readonly string ApiUrl = "https://tenxoxauthentication.qzz.io";
-        private readonly HttpClient client = new HttpClient();
+        private readonly RSA signingKey;
 
-        public bool IsInitialized { get; private set; } = false;
-        public bool IsLoggedIn { get; private set; } = false;
+        public bool IsInitialized { get; private set; }
+        public bool IsLoggedIn { get; private set; }
         public UserData User { get; private set; }
         public string ResponseMessage { get; private set; } = "";
 
-        // Simplified property access
-        public string Response { get { return ResponseMessage; } }
-        public string this[string name] { get { return Var(name); } }
-
+        public string Response => ResponseMessage;
+        public string this[string name] => Var(name);
         public Dictionary<string, string> Variables { get; private set; } = new Dictionary<string, string>();
-        public bool IsApplicationActive { get; private set; } = false;
-        public bool IsVersionCorrect { get; private set; } = false;
+        public bool IsApplicationActive { get; private set; }
+        public bool IsVersionCorrect { get; private set; }
         public string ServerVersion { get; private set; } = "";
 
-        // Import Windows API functions for console
         [DllImport("kernel32.dll")]
         private static extern bool AllocConsole();
-
         [DllImport("kernel32.dll")]
         private static extern bool FreeConsole();
-
         [DllImport("kernel32.dll")]
         private static extern IntPtr GetConsoleWindow();
-
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible(IntPtr hWnd);
-
+        [DllImport("user32.dll")]
+        private static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int processId);
         private const int SW_HIDE = 0;
         private const int SW_SHOW = 5;
         private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
-        [DllImport("user32.dll")]
-        private static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+        public class ApiResponse
+        {
+            public bool Success { get; set; }
+            public string Message { get; set; }
+            public string Username { get; set; }
+            public string Subscription { get; set; }
+            public string Expiry { get; set; }
+            public string ServerVersion { get; set; }
+            public string Value { get; set; }
+            public Dictionary<string, string> Variables { get; set; }
+            public string RequestNonce { get; set; }
+            public string ServerTimestamp { get; set; }
+            public string Signature { get; set; }
+        }
+
+        public class LoginResult
+        {
+            public bool Success { get; set; }
+            public string Message { get; set; }
+            public UserData User { get; set; }
+        }
+
+        public class RegisterResult
+        {
+            public bool Success { get; set; }
+            public string Message { get; set; }
+        }
+
+        public class UserData
+        {
+            public string Username { get; set; }
+            public string Subscription { get; set; }
+            public string Expiry { get; set; }
+        }
+
         public TXA(string name, string secret, string version)
         {
             AppName = name;
             Secret = secret;
             Version = version;
+
+            signingKey = RSA.Create();
+            ImportPublicKey(signingKey, EmbeddedPublicKeyPem);
         }
 
         public void Init()
         {
             if (string.IsNullOrEmpty(AppName) || string.IsNullOrEmpty(Secret) || string.IsNullOrEmpty(Version))
             {
-                ShowError("TXA Auth Error", "AppName/Secret/Version missing");
+                ShowError("Security Alert", TamperMessage);
                 Environment.Exit(0);
             }
 
-            // Run initialization in a background task
-            var initTask = Task.Run(async () =>
+            try
             {
-                try
+                bool paused = CheckIfPaused().GetAwaiter().GetResult();
+                if (paused)
                 {
-                    bool paused = await CheckIfPaused();
-                    if (paused)
-                    {
-                        ShowError("Application Paused", "Application is currently paused by administrator");
-                        Environment.Exit(0);
-                    }
-
-                    IsApplicationActive = !paused;
-
-                    var versionCheck = await CheckVersionWithDetails();
-                    IsVersionCorrect = versionCheck.isValid;
-                    ServerVersion = versionCheck.serverVersion;
-
-                    if (!IsVersionCorrect)
-                    {
-                        ShowError("Update Required",
-                            $"Version mismatch!\n\nYour version: {Version}\nServer version: {ServerVersion}\n\nPlease update to the latest version.");
-                        Environment.Exit(0);
-                    }
-
-                    await LoadApplicationVariables();
-
-                    IsInitialized = true;
-                    ResponseMessage = "TXA SDK Initialized successfully!";
-                }
-                catch (Exception ex)
-                {
-                    ShowError("Init Error", $"Initialization failed: {ex.Message}");
+                    ShowError("Application Paused", "Application is currently paused by administrator");
                     Environment.Exit(0);
                 }
-            });
-        }
 
-        private void ShowError(string title, string message)
-        {
-            HideAllWindows();
-            AllocConsole();
-            IntPtr consoleHandle = GetConsoleWindow();
-            if (consoleHandle != IntPtr.Zero)
-            {
-                ShowWindow(consoleHandle, SW_SHOW);
+                IsApplicationActive = true;
+
+                var versionCheck = CheckVersionWithDetails().GetAwaiter().GetResult();
+                IsVersionCorrect = versionCheck.isValid;
+                ServerVersion = versionCheck.serverVersion;
+
+                if (!IsVersionCorrect)
+                {
+                    ShowError("Update Required",
+                        $"Version mismatch!\n\nYour version: {Version}\nServer version: {ServerVersion}\n\nPlease update to the latest version.");
+                    Environment.Exit(0);
+                }
+
+                LoadApplicationVariables().GetAwaiter().GetResult();
+                IsInitialized = true;
+                ResponseMessage = "TXA SDK initialized with signed-response verification.";
             }
-
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"\n╔{new string('═', 70)}╗");
-            Console.WriteLine($"║ {title.PadRight(69)} ║");
-            Console.WriteLine($"╠{new string('═', 70)}╣");
-
-            string[] lines = message.Split('\n');
-            foreach (string line in lines)
+            catch
             {
-                Console.WriteLine($"║ {line.PadRight(69)} ║");
+                ShowError("Security Alert", TamperMessage);
+                Environment.Exit(0);
             }
-
-            Console.WriteLine($"╚{new string('═', 70)}╝");
-            Console.ResetColor();
-            Console.WriteLine("\nPress any key to exit...");
-            Console.ReadKey();
-
-            FreeConsole();
         }
-    
-        private void HideAllWindows()
-        {
-
-          int currentProcessId = Process.GetCurrentProcess().Id;
-          EnumWindows((hWnd, lParam) =>
-          {
-
-              GetWindowThreadProcessId(hWnd, out int processId);
-              if (processId == currentProcessId && IsWindowVisible(hWnd))
-              {
-                   
-                  ShowWindow(hWnd, SW_HIDE);
-              
-              }
-              return true;
-           
-          }, IntPtr.Zero);
-        }
-
-        [DllImport("user32.dll")]
-        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int processId);
 
         public async Task<LoginResult> Login(string username, string password)
         {
@@ -177,96 +167,48 @@ namespace TXAAuth
 
             try
             {
-                string hwid = GetHWID();
-                var payload = new
+                var response = await SendRequest("login", new Dictionary<string, string>
                 {
-                    username,
-                    password,
-                    secret = Secret,
-                    appName = AppName,
-                    appVersion = Version,
-                    hwid
-                };
-
-                var response = await SendRequest("login", payload);
+                    ["username"] = username,
+                    ["password"] = password,
+                    ["secret"] = Secret,
+                    ["appName"] = AppName,
+                    ["appVersion"] = Version,
+                    ["hwid"] = GetHWID()
+                });
 
                 if (response.Success)
                 {
                     IsLoggedIn = true;
-
-                    string GetVal(string key)
-                    {
-                        if (response.Data.ContainsKey(key) && response.Data[key] is JsonElement el)
-                            return el.ValueKind == JsonValueKind.String ? el.GetString() : el.ToString();
-                        return null;
-                    }
-
                     User = new UserData
                     {
-                        Username = GetVal("username"),
-                        Subscription = GetVal("subscription"),
-                        Expiry = GetVal("expiry")
+                        Username = response.Username,
+                        Subscription = response.Subscription,
+                        Expiry = response.Expiry
                     };
 
                     await LoadUserVariables();
                     ResponseMessage = $"Login successful! Welcome, {User.Username}";
-
                     loginResult.Success = true;
                     loginResult.Message = ResponseMessage;
                     loginResult.User = User;
                     return loginResult;
                 }
-                else
-                {
-                    string errorMessage = response.Message;
-                    string formattedMessage;
 
-                    if (errorMessage.Contains("INVALID_CREDENTIALS") ||
-                        errorMessage.Contains("Invalid username or password"))
-                    {
-                        formattedMessage = "Invalid username or password";
-                    }
-                    else if (errorMessage.Contains("HWID_RESET") ||
-                             errorMessage.Contains("HWID_MISMATCH"))
-                    {
-                        formattedMessage = "HWID mismatch. Please contact support to reset your HWID";
-                    }
-                    else if (errorMessage.Contains("BANNED") ||
-                             errorMessage.Contains("suspended"))
-                    {
-                        formattedMessage = "Account has been banned or suspended";
-                    }
-                    else if (errorMessage.Contains("expired") ||
-                             errorMessage.Contains("EXPIRED"))
-                    {
-                        formattedMessage = "Subscription has expired";
-                    }
-                    else if (errorMessage.Contains("MAX_DEVICES"))
-                    {
-                        formattedMessage = "Maximum number of devices reached";
-                    }
-                    else
-                    {
-                        formattedMessage = $"Login failed: {response.Message}";
-                    }
-
-                    ResponseMessage = formattedMessage;
-                    loginResult.Success = false;
-                    loginResult.Message = formattedMessage;
-                    return loginResult;
-                }
+                ResponseMessage = FormatErrorMessage(response.Message, "login");
+                loginResult.Success = false;
+                loginResult.Message = ResponseMessage;
+                return loginResult;
             }
-            catch (Exception ex)
+            catch
             {
-                ResponseMessage = $"Connection error: {ex.Message}";
+                ResponseMessage = TamperMessage;
                 loginResult.Success = false;
                 loginResult.Message = ResponseMessage;
                 return loginResult;
             }
         }
 
-    
-    
         public async Task<RegisterResult> Register(string username, string password, string license)
         {
             ResponseMessage = "";
@@ -282,19 +224,16 @@ namespace TXAAuth
 
             try
             {
-                string hwid = GetHWID();
-                var payload = new
+                var response = await SendRequest("register", new Dictionary<string, string>
                 {
-                    username,
-                    password,
-                    licenseKey = license,
-                    secret = Secret,
-                    appName = AppName,
-                    appVersion = Version,
-                    hwid
-                };
-
-                var response = await SendRequest("register", payload);
+                    ["username"] = username,
+                    ["password"] = password,
+                    ["licenseKey"] = license,
+                    ["secret"] = Secret,
+                    ["appName"] = AppName,
+                    ["appVersion"] = Version,
+                    ["hwid"] = GetHWID()
+                });
 
                 if (response.Success)
                 {
@@ -303,83 +242,24 @@ namespace TXAAuth
                     registerResult.Message = ResponseMessage;
                     return registerResult;
                 }
-                else
-                {
-                    string errorMessage = response.Message;
-                    string formattedMessage;
 
-                    if (errorMessage.Contains("INVALID_LICENSE"))
-                    {
-                        formattedMessage = "Invalid license key";
-                    }
-                    else if (errorMessage.Contains("USERNAME_TAKEN"))
-                    {
-                        formattedMessage = "Username is already taken";
-                    }
-                    else if (errorMessage.Contains("LICENSE_USED"))
-                    {
-                        formattedMessage = "License key has already been used";
-                    }
-                    else if (errorMessage.Contains("LICENSE_EXPIRED"))
-                    {
-                        formattedMessage = "License key has expired";
-                    }
-                    else if (errorMessage.Contains("WEAK_PASSWORD"))
-                    {
-                        formattedMessage = "Password is too weak. Please use a stronger password";
-                    }
-                    else if (errorMessage.Contains("INVALID_USERNAME"))
-                    {
-                        formattedMessage = "Invalid username format";
-                    }
-                    else
-                    {
-                        formattedMessage = $"Registration failed: {response.Message}";
-                    }
-
-                    ResponseMessage = formattedMessage;
-                    registerResult.Success = false;
-                    registerResult.Message = formattedMessage;
-                    return registerResult;
-                }
+                ResponseMessage = FormatErrorMessage(response.Message, "register");
+                registerResult.Success = false;
+                registerResult.Message = ResponseMessage;
+                return registerResult;
             }
-            catch (Exception ex)
+            catch
             {
-                ResponseMessage = $"Connection error: {ex.Message}";
+                ResponseMessage = TamperMessage;
                 registerResult.Success = false;
                 registerResult.Message = ResponseMessage;
                 return registerResult;
             }
         }
 
-   
         public string Var(string varName)
         {
-            string val;
-            if (Variables.TryGetValue(varName, out val))
-            {
-                return val;
-            }
-            return "VARIABLE_NOT_FOUND";
-        }
-
-        public T Get<T>(string varName)
-        {
-            string value = Var(varName);
-            if (value == "VARIABLE_NOT_FOUND") return default(T);
-
-            try
-            {
-                if (typeof(T) == typeof(bool))
-                {
-                    return (T)(object)(value.ToLower() == "true");
-                }
-                return (T)Convert.ChangeType(value, typeof(T));
-            }
-            catch
-            {
-                return default(T);
-            }
+            return Variables.TryGetValue(varName, out string value) ? value : "VARIABLE_NOT_FOUND";
         }
 
         public async Task<string> GetVariable(string varName)
@@ -400,44 +280,29 @@ namespace TXAAuth
 
             try
             {
-                var payload = new
+                var response = await SendRequest("getvariable", new Dictionary<string, string>
                 {
-                    secret = Secret,
-                    appName = AppName,
-                    appVersion = Version,
-                    varName
-                };
+                    ["secret"] = Secret,
+                    ["appName"] = AppName,
+                    ["appVersion"] = Version,
+                    ["varName"] = varName
+                });
 
-                var response = await SendRequest("getvariable", payload);
+                if (response.Success && !string.IsNullOrEmpty(response.Value))
+                {
+                    Variables[varName] = response.Value;
+                    ResponseMessage = $"Variable '{varName}' retrieved successfully";
+                    return response.Value;
+                }
 
-                if (response.Success)
-                {
-                    if (response.Data.ContainsKey("value") && response.Data["value"] is JsonElement valueElement)
-                    {
-                        string value = valueElement.ToString();
-                        Variables[varName] = value;
-                        ResponseMessage = $"Variable '{varName}' retrieved successfully";
-                        return value;
-                    }
-                    ResponseMessage = $"Variable '{varName}' not found";
-                    return null;
-                }
-                else
-                {
-                    if (response.Message != "VARIABLE_NOT_FOUND")
-                    {
-                        ResponseMessage = $"Failed to get variable '{varName}': {response.Message}";
-                    }
-                    else
-                    {
-                        ResponseMessage = $"Variable '{varName}' not found";
-                    }
-                    return null;
-                }
+                ResponseMessage = response.Message == "VARIABLE_NOT_FOUND"
+                    ? $"Variable '{varName}' not found"
+                    : $"Failed to get variable '{varName}': {response.Message}";
+                return null;
             }
-            catch (Exception ex)
+            catch
             {
-                ResponseMessage = $"Connection error: {ex.Message}";
+                ResponseMessage = TamperMessage;
                 return null;
             }
         }
@@ -455,100 +320,78 @@ namespace TXAAuth
             try
             {
                 bool result = await LoadApplicationVariables();
-                if (result)
-                {
-                    ResponseMessage = $"Successfully refreshed {Variables.Count} variables";
-                    return true;
-                }
-                else
-                {
-                    ResponseMessage = "No variables found or failed to load";
-                    return false;
-                }
+                ResponseMessage = result
+                    ? $"Successfully refreshed {Variables.Count} variables"
+                    : "No variables found or failed to load";
+                return result;
             }
-            catch (Exception ex)
+            catch
             {
-                ResponseMessage = $"Failed to refresh variables: {ex.Message}";
+                ResponseMessage = TamperMessage;
                 return false;
             }
         }
 
         private async Task<bool> CheckIfPaused()
         {
-            var payload = new { secret = Secret, appName = AppName };
-            var response = await SendRequest("isapplicationpaused", payload);
+            var response = await SendRequest("isapplicationpaused", new Dictionary<string, string>
+            {
+                ["secret"] = Secret,
+                ["appName"] = AppName
+            });
+
             return response.Success && response.Message == "APPLICATION_PAUSED";
         }
 
         private async Task<(bool isValid, string serverVersion)> CheckVersionWithDetails()
         {
-            var payload = new { secret = Secret, appName = AppName, appVersion = Version };
-            var response = await SendRequest("versioncheck", payload);
-
-            if (response.Success)
+            var response = await SendRequest("versioncheck", new Dictionary<string, string>
             {
-                if (response.Message == "VERSION_OK")
-                {
-                    return (true, Version);
-                }
-                else if (response.Message == "VERSION_MISMATCH")
-                {
-                    if (response.Data.ContainsKey("serverVersion") && response.Data["serverVersion"] is JsonElement serverVersionElement)
-                    {
-                        return (false, serverVersionElement.GetString());
-                    }
-                    return (false, "Unknown");
-                }
+                ["secret"] = Secret,
+                ["appName"] = AppName,
+                ["appVersion"] = Version
+            });
+
+            if (response.Success && response.Message == "VERSION_OK")
+            {
+                return (true, Version);
             }
-            return (false, "Unknown");
+
+            if (response.Message == "VERSION_MISMATCH")
+            {
+                return (false, response.ServerVersion ?? "Unknown");
+            }
+
+            throw new InvalidOperationException(TamperMessage);
         }
 
         private async Task<bool> LoadApplicationVariables()
         {
-            try
+            var response = await SendRequest("getvariables", new Dictionary<string, string>
             {
-                var payload = new { secret = Secret, appName = AppName };
-                var response = await SendRequest("getvariables", payload);
+                ["secret"] = Secret,
+                ["appName"] = AppName
+            });
 
-                if (response.Success && response.Message != "NO_VARIABLES")
+            if (response.Success && response.Message != "NO_VARIABLES" && response.Variables != null)
+            {
+                Variables.Clear();
+                foreach (var kvp in response.Variables)
                 {
-                    if (response.Data.ContainsKey("variables") && response.Data["variables"] is JsonElement variablesElement)
-                    {
-                        Variables.Clear();
-
-                        if (variablesElement.ValueKind == JsonValueKind.Object)
-                        {
-                            foreach (var prop in variablesElement.EnumerateObject())
-                            {
-                                Variables[prop.Name] = prop.Value.ToString();
-                            }
-                        }
-                        return true;
-                    }
+                    Variables[kvp.Key] = kvp.Value;
                 }
-                return false;
+                return Variables.Count > 0;
             }
-            catch
-            {
-                return false;
-            }
+
+            return false;
         }
 
         private async Task LoadUserVariables()
         {
             if (IsLoggedIn && User != null)
             {
-                string userSettings = await GetVariable($"user_{User.Username}_settings");
-                if (!string.IsNullOrEmpty(userSettings))
-                {
-                    Console.WriteLine($"Loaded user settings for {User.Username}");
-                }
-
-                string permissions = await GetVariable($"permissions_{User.Subscription}");
-                if (!string.IsNullOrEmpty(permissions))
-                {
-                    Console.WriteLine($"Loaded permissions for subscription: {User.Subscription}");
-                }
+                await GetVariable($"user_{User.Username}_settings");
+                await GetVariable($"permissions_{User.Subscription}");
             }
         }
 
@@ -556,65 +399,336 @@ namespace TXAAuth
         {
             try
             {
-                string sid = WindowsIdentity.GetCurrent().User.Value;
-                return sid;
+                return WindowsIdentity.GetCurrent().User?.Value ?? "HWID_FAIL";
             }
-            catch (Exception)
+            catch
             {
                 return "HWID_FAIL";
             }
         }
 
-        private async Task<ApiResponse> SendRequest(string endpoint, object payload)
+        private async Task<ApiResponse> SendRequest(string endpoint, Dictionary<string, string> payload)
         {
-            string json = JsonSerializer.Serialize(payload);
-            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            string clientNonce = Guid.NewGuid().ToString("N").ToUpperInvariant();
+            string clientTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
 
-            var result = await client.PostAsync($"{ApiUrl}/{endpoint}", content);
-            string responseBody = await result.Content.ReadAsStringAsync();
+            payload["clientNonce"] = clientNonce;
+            payload["clientTimestamp"] = clientTimestamp;
 
             try
             {
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                return JsonSerializer.Deserialize<ApiResponse>(responseBody, options);
+                string json = JsonConvert.SerializeObject(payload);
+                byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
+
+                var request = WebRequest.Create($"{ApiUrl}/{endpoint}");
+                request.Method = "POST";
+                request.ContentType = "application/json";
+                request.ContentLength = jsonBytes.Length;
+                request.Headers["X-TXA-Nonce"] = clientNonce;
+                request.Headers["X-TXA-Timestamp"] = clientTimestamp;
+
+                using (var stream = await request.GetRequestStreamAsync())
+                {
+                    await stream.WriteAsync(jsonBytes, 0, jsonBytes.Length);
+                }
+
+                using (var response = await request.GetResponseAsync())
+                using (var stream = response.GetResponseStream())
+                using (var reader = new StreamReader(stream))
+                {
+                    string responseString = await reader.ReadToEndAsync();
+                    var parsed = ParseJson(responseString);
+                    VerifyResponseSignature(endpoint, clientNonce, parsed);
+                    return parsed;
+                }
             }
-            catch
+            catch (WebException webEx)
             {
-                return new ApiResponse { Success = false, Message = "Invalid response from server" };
+                if (webEx.Response != null)
+                {
+                    using (var stream = webEx.Response.GetResponseStream())
+                    using (var reader = new StreamReader(stream))
+                    {
+                        string errorResponse = await reader.ReadToEndAsync();
+                        var parsed = ParseJson(errorResponse);
+                        VerifyResponseSignature(endpoint, clientNonce, parsed);
+                        return parsed;
+                    }
+                }
+
+                throw new InvalidOperationException(TamperMessage);
             }
         }
 
-   
-        public class LoginResult
+        private ApiResponse ParseJson(string json)
         {
-            public bool Success { get; set; }
-            public string Message { get; set; }
-            public UserData User { get; set; }
+            return JsonConvert.DeserializeObject<ApiResponse>(json) ?? new ApiResponse();
         }
 
-        public class RegisterResult
+        private void VerifyResponseSignature(string endpoint, string clientNonce, ApiResponse response)
         {
-            public bool Success { get; set; }
-            public string Message { get; set; }
+            if (response == null ||
+                string.IsNullOrWhiteSpace(response.RequestNonce) ||
+                string.IsNullOrWhiteSpace(response.ServerTimestamp) ||
+                string.IsNullOrWhiteSpace(response.Signature))
+            {
+                throw new InvalidOperationException(TamperMessage);
+            }
+
+            if (!string.Equals(response.RequestNonce, clientNonce, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(TamperMessage);
+            }
+
+            if (!long.TryParse(response.ServerTimestamp, out long serverTimestamp))
+            {
+                throw new InvalidOperationException(TamperMessage);
+            }
+
+            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            if (Math.Abs(now - serverTimestamp) > AllowedClockSkewSeconds)
+            {
+                throw new InvalidOperationException(TamperMessage);
+            }
+
+            string payload = BuildSignaturePayload(endpoint, response);
+            byte[] signatureBytes = Convert.FromBase64String(response.Signature);
+            byte[] payloadBytes = Encoding.UTF8.GetBytes(payload);
+
+            if (!signingKey.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1))
+            {
+                throw new CryptographicException(TamperMessage);
+            }
         }
 
-        public class ApiResponse
+        private string BuildSignaturePayload(string endpoint, ApiResponse response)
         {
-            [JsonPropertyName("success")]
-            public bool Success { get; set; }
+            var variables = response.Variables ?? new Dictionary<string, string>();
+            var keys = new List<string>(variables.Keys);
+            keys.Sort(StringComparer.Ordinal);
 
-            [JsonPropertyName("message")]
-            public string Message { get; set; }
+            StringBuilder variableBuilder = new StringBuilder();
+            foreach (string key in keys)
+            {
+                variableBuilder.Append(key);
+                variableBuilder.Append('=');
+                variableBuilder.Append(NormalizeString(variables[key]));
+                variableBuilder.Append('\n');
+            }
 
-            [JsonExtensionData]
-            public Dictionary<string, object> Data { get; set; }
+            StringBuilder builder = new StringBuilder();
+            builder.Append("endpoint=").Append(Sha256Hex(endpoint)).Append('\n');
+            builder.Append("requestNonce=").Append(Sha256Hex(response.RequestNonce)).Append('\n');
+            builder.Append("serverTimestamp=").Append(Sha256Hex(response.ServerTimestamp)).Append('\n');
+            builder.Append("success=").Append(response.Success ? "1" : "0").Append('\n');
+            builder.Append("message=").Append(Sha256Hex(response.Message)).Append('\n');
+            builder.Append("username=").Append(Sha256Hex(response.Username)).Append('\n');
+            builder.Append("subscription=").Append(Sha256Hex(response.Subscription)).Append('\n');
+            builder.Append("expiry=").Append(Sha256Hex(response.Expiry)).Append('\n');
+            builder.Append("serverVersion=").Append(Sha256Hex(response.ServerVersion)).Append('\n');
+            builder.Append("value=").Append(Sha256Hex(response.Value)).Append('\n');
+            builder.Append("variables=").Append(Sha256Hex(variableBuilder.ToString())).Append('\n');
+            return builder.ToString();
         }
 
-        public class UserData
+        private static string Sha256Hex(string value)
         {
-            public string Username { get; set; }
-            public string Subscription { get; set; }
-            public string Expiry { get; set; }
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(NormalizeString(value)));
+                StringBuilder builder = new StringBuilder(hash.Length * 2);
+                foreach (byte b in hash)
+                {
+                    builder.Append(b.ToString("X2"));
+                }
+                return builder.ToString();
+            }
+        }
+
+        private static string NormalizeString(string value)
+        {
+            return value ?? string.Empty;
+        }
+
+        private static void ImportPublicKey(RSA rsa, string pem)
+        {
+            string publicKey = pem
+                .Replace("-----BEGIN PUBLIC KEY-----", string.Empty)
+                .Replace("-----END PUBLIC KEY-----", string.Empty)
+                .Replace("\r", string.Empty)
+                .Replace("\n", string.Empty)
+                .Trim();
+
+            byte[] keyBytes = Convert.FromBase64String(publicKey);
+            RSAParameters parameters = DecodeSubjectPublicKeyInfo(keyBytes);
+            rsa.ImportParameters(parameters);
+        }
+
+        private static RSAParameters DecodeSubjectPublicKeyInfo(byte[] subjectPublicKeyInfo)
+        {
+            using (BinaryReader reader = new BinaryReader(new MemoryStream(subjectPublicKeyInfo)))
+            {
+                ReadAsn1Sequence(reader);
+                SkipAsn1Element(reader);
+
+                byte bitStringTag = reader.ReadByte();
+                if (bitStringTag != 0x03)
+                {
+                    throw new CryptographicException("Invalid public key format.");
+                }
+
+                ReadAsn1Length(reader);
+                reader.ReadByte();
+
+                return DecodeRsaPublicKey(reader);
+            }
+        }
+
+        private static RSAParameters DecodeRsaPublicKey(BinaryReader reader)
+        {
+            ReadAsn1Sequence(reader);
+
+            byte[] modulus = ReadAsn1Integer(reader);
+            byte[] exponent = ReadAsn1Integer(reader);
+
+            return new RSAParameters
+            {
+                Modulus = modulus,
+                Exponent = exponent
+            };
+        }
+
+        private static void ReadAsn1Sequence(BinaryReader reader)
+        {
+            if (reader.ReadByte() != 0x30)
+            {
+                throw new CryptographicException("Invalid ASN.1 sequence.");
+            }
+
+            ReadAsn1Length(reader);
+        }
+
+        private static void SkipAsn1Element(BinaryReader reader)
+        {
+            reader.ReadByte();
+            int length = ReadAsn1Length(reader);
+            reader.ReadBytes(length);
+        }
+
+        private static byte[] ReadAsn1Integer(BinaryReader reader)
+        {
+            if (reader.ReadByte() != 0x02)
+            {
+                throw new CryptographicException("Invalid ASN.1 integer.");
+            }
+
+            int length = ReadAsn1Length(reader);
+            byte[] value = reader.ReadBytes(length);
+
+            if (value.Length > 1 && value[0] == 0x00)
+            {
+                byte[] trimmed = new byte[value.Length - 1];
+                Buffer.BlockCopy(value, 1, trimmed, 0, trimmed.Length);
+                return trimmed;
+            }
+
+            return value;
+        }
+
+        private static int ReadAsn1Length(BinaryReader reader)
+        {
+            int length = reader.ReadByte();
+            if ((length & 0x80) == 0)
+            {
+                return length;
+            }
+
+            int byteCount = length & 0x7F;
+            if (byteCount == 0 || byteCount > 4)
+            {
+                throw new CryptographicException("Invalid ASN.1 length.");
+            }
+
+            int value = 0;
+            for (int i = 0; i < byteCount; i++)
+            {
+                value = (value << 8) | reader.ReadByte();
+            }
+
+            return value;
+        }
+
+        private string FormatErrorMessage(string errorMessage, string operation)
+        {
+            if (string.IsNullOrEmpty(errorMessage))
+                return $"{operation} failed";
+
+            string upperMsg = errorMessage.ToUpperInvariant();
+
+            if (operation == "login")
+            {
+                if (upperMsg.Contains("INVALID_CREDENTIALS") || upperMsg.Contains("INVALID USERNAME OR PASSWORD"))
+                    return "Invalid username or password";
+                if (upperMsg.Contains("HWID_RESET") || upperMsg.Contains("HWID_MISMATCH"))
+                    return "HWID mismatch. Please contact support to reset your HWID";
+                if (upperMsg.Contains("BANNED") || upperMsg.Contains("SUSPENDED"))
+                    return "Account has been banned or suspended";
+                if (upperMsg.Contains("EXPIRED"))
+                    return "Subscription has expired";
+            }
+            else if (operation == "register")
+            {
+                if (upperMsg.Contains("INVALID_LICENSE"))
+                    return "Invalid license key";
+                if (upperMsg.Contains("USERNAME_TAKEN"))
+                    return "Username is already taken";
+                if (upperMsg.Contains("LICENSE_USED"))
+                    return "License key has already been used";
+                if (upperMsg.Contains("LICENSE_EXPIRED"))
+                    return "License key has expired";
+            }
+
+            return $"{operation} failed: {errorMessage}";
+        }
+
+        private void ShowError(string title, string message)
+        {
+            HideAllWindows();
+            AllocConsole();
+            IntPtr consoleHandle = GetConsoleWindow();
+            if (consoleHandle != IntPtr.Zero)
+            {
+                ShowWindow(consoleHandle, SW_SHOW);
+            }
+
+            Console.ForegroundColor = ConsoleColor.Red;
+            string border = new string('=', 70);
+            Console.WriteLine($"\n[{border}]");
+            Console.WriteLine($"[ {title.PadRight(69)} ]");
+            Console.WriteLine($"[{border}]");
+            foreach (string line in message.Split('\n'))
+            {
+                Console.WriteLine($"[ {line.PadRight(69)} ]");
+            }
+            Console.WriteLine($"[{border}]");
+            Console.ResetColor();
+            Console.WriteLine("\nPress any key to exit...");
+            Console.ReadKey();
+            FreeConsole();
+        }
+
+        private void HideAllWindows()
+        {
+            int currentProcessId = Process.GetCurrentProcess().Id;
+            EnumWindows((hWnd, lParam) =>
+            {
+                GetWindowThreadProcessId(hWnd, out int processId);
+                if (processId == currentProcessId && IsWindowVisible(hWnd))
+                {
+                    ShowWindow(hWnd, SW_HIDE);
+                }
+                return true;
+            }, IntPtr.Zero);
         }
     }
 }
