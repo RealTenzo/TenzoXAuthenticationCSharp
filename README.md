@@ -15,7 +15,7 @@
 ## Requirements
 
 * .NET Framework / .NET Core
-* **System.Text.Json** (install via NuGet)
+* **Newtonsoft.Json** (install via NuGet)
 
 ```bash
 Install-Package System.Text.Json
@@ -88,7 +88,7 @@ var result = await TXA.Login(textBox1.Text, textBox2.Text);
 
 ## Credits
 
-* Uses **System.Text.Json** for JSON serialization and parsing
+* Uses **Newtonsoft.Json** for JSON serialization and parsing
 
 
 ## Contributing
