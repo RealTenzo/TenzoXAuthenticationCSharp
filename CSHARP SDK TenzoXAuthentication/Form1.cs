@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows.Forms;
 using TXAAuth;
 
@@ -7,17 +7,17 @@ namespace CSHARP_SDK_TenzoXAuthentication
     public partial class Form1 : Form
     {
         public static TXA TXA = new TXA(
-          name: "",
-          secret: "",
+          name: "app_name",
+          secret: "TXA-secret",
           version: "1.0"
         );
 
         public Form1()
         {
             InitializeComponent();
-            TXA.Init();
         }
 
+     
 
         private async void button1_Click(object sender, EventArgs e)
         {
