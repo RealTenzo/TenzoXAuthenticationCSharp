@@ -18,7 +18,7 @@
 * **Newtonsoft.Json** (install via NuGet)
 
 ```bash
-Install-Package System.Text.Json
+Install-Package Newtonsoft.Json
 ```
 
 ## Installation
